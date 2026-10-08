@@ -1,0 +1,27 @@
+name: Run Dime Stock Bot Daily
+
+on:
+  schedule:
+    # รันอัตโนมัติทุกวัน เวลา 13:00 UTC (ตรงกับ 20:00 น. เวลาไทย)
+    - cron: '0 13 * * *'
+  workflow_dispatch: # ปุ่มสำหรับกดทดสอบรันเองได้ตลอดเวลา
+
+jobs:
+  run-bot:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run Dime Bot Script
+        run: python dime_bot.py

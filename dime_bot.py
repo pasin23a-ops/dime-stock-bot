@@ -1,17 +1,29 @@
-import os
-import requests
-import yfinance as yf
 import pandas as pd
+import numpy as np
+import yfinance as yf
+import requests
 from datetime import datetime, timedelta
 
-# ดึงค่า Secrets จาก GitHub Actions
-TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
-TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
+# ==========================================
+# ⚙️ ตั้งค่าข้อมูลบอท Dime!
+# ==========================================
+TELEGRAM_BOT_TOKEN = "8938668097:AAFmVzQa6qIefASoTo2WfKk4FRytQyRPcJw"
+TELEGRAM_CHAT_ID = "8644030650"
 
-# รายชื่อหุ้นในแอป Dime! ที่ต้องการติดตาม
-WATCHLIST = ["NVDA", "AAPL", "TSLA", "MSFT", "PLTR", "AMZN", "GOOGL"]
-PROFIT_TARGET_PCT = 0.10  # เป้าหมายกำไร 10%
+# 🚀 รายชื่อหุ้นยอดฮิตบน Dime! (สภาพคล่องสูง มีเทรนด์ชัดเจน)
+WATCHLIST = [
+    "NVDA", "AAPL", "TSLA", "MSFT", "PLTR", 
+    "AMZN", "GOOGL", "META", "AMD", "NFLX", 
+    "COIN", "SPY", "QQQ"
+]
 
+# 🎯 บริหารความเสี่ยง (Risk / Reward = 1 : 2)
+PROFIT_TARGET_PCT = 10.0  # เป้ากำไร +10%
+STOP_LOSS_PCT = 5.0      # คัดขาดทุน -5%
+
+# ==========================================
+# 📊 ฟังก์ชั่นคำนวณเทคนิคัล
+# ==========================================
 def calculate_rsi(series, period=14):
     delta = series.diff()
     gain = (delta.where(delta > 0, 0)).rolling(window=period).mean()
@@ -19,64 +31,125 @@ def calculate_rsi(series, period=14):
     rs = gain / loss
     return 100 - (100 / (1 + rs))
 
-def analyze_stock(ticker):
-    try:
-        stock = yf.Ticker(ticker)
-        df = stock.history(period="6m")
-        if df.empty or len(df) < 30:
-            return None, None
-        
-        df['RSI'] = calculate_rsi(df['Close'])
-        
+def get_average_cycle_days(df):
+    rsi = df['RSI']
+    periods = []
+    in_buy = False
+    buy_date = None
+
+    for i in range(len(df)):
+        if not in_buy and rsi.iloc[i] <= 42:
+            in_buy = True
+            buy_date = df.index[i]
+        elif in_buy and rsi.iloc[i] >= 60:
+            in_buy = False
+            sell_date = df.index[i]
+            days = (sell_date - buy_date).days
+            if days > 0:
+                periods.append(days)
+
+    return int(np.mean(periods)) if len(periods) > 0 else 14
+
+def send_telegram_message(message):
+    if TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID:
+        url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+        payload = {"chat_id": TELEGRAM_CHAT_ID, "text": message, "parse_mode": "Markdown"}
+        try:
+            res = requests.post(url, data=payload, timeout=10)
+            if res.status_code != 200:
+                print(f"⚠️ เกิดข้อผิดพลาด Telegram API: {res.text}")
+        except Exception as e:
+            print(f"⚠️ ส่ง Telegram ไม่สำเร็จ: {e}")
+
+# ==========================================
+# 🚀 ระบบประมวลผลวิเคราะห์หุ้นเพื่อกำไรจริง
+# ==========================================
+def run_dime_bot():
+    print(f"\n⏰ [{datetime.now().strftime('%d/%m/%Y %H:%M:%S')}] กำลังวิเคราะห์หุ้น Dime!...")
+    all_reports = []
+    alert_reports = []
+
+    today_str = datetime.now().strftime('%d/%m/%Y')
+
+    for ticker in WATCHLIST:
+        df = yf.download(ticker, period="1y", interval="1d", progress=False)
+        if df.empty or len(df) < 50:
+            continue
+
+        if isinstance(df.columns, pd.MultiIndex):
+            df.columns = df.columns.get_level_values(0)
+
+        # คำนวณ RSI และ EMA 50 (ใช้ดูแนวโน้มใหญ่)
+        df['RSI'] = calculate_rsi(df['Close'], period=14)
+        df['EMA50'] = df['Close'].ewm(span=50, adjust=False).mean()
+
         last_price = float(df['Close'].iloc[-1])
         last_rsi = float(df['RSI'].iloc[-1])
-        today_str = datetime.now().strftime("%Y-%m-%d")
+        ema50 = float(df['EMA50'].iloc[-1])
         
-        # คาดการณ์วันที่ควรขาย (คำนวณจากรอบระยะเวลาการย่อตัวเฉลี่ย ~14 วัน)
-        est_sell_date = (datetime.now() + timedelta(days=14)).strftime("%Y-%m-%d")
-        
-        # คำนวณราคาเป้าหมายขาย และ จำนวนเงินกำไรที่จะได้รับต่อ 1 หุ้น
+        # เช็คแนวโน้ม (Uptrend)
+        is_uptrend = last_price > ema50
+        cycle_days = get_average_cycle_days(df)
+
         buy_price = last_price
-        target_sell_price = buy_price * (1 + PROFIT_TARGET_PCT)
-        profit_usd = target_sell_price - buy_price
+        sell_price = buy_price * (1 + (PROFIT_TARGET_PCT / 100.0))
+        profit_usd = sell_price - buy_price
+        stop_loss = buy_price * (1 - (STOP_LOSS_PCT / 100.0))
         
-        status = "HOLD"
-        signal_text = "ยังไม่ถึงจุดซื้อ (ถือรอสัญญาณ)"
-        
-        if last_rsi <= 42:
-            status = "BUY"
-            signal_text = f"🟢 **เข้าซื้อได้วันนี้ ({today_str})** (RSI อยู่ในเขตราคาถูก)"
-        elif last_rsi >= 70:
-            status = "SELL"
-            signal_text = f"🔴 **ควรขายทำกำไรวันนี้ ({today_str})** (RSI สูงเกินไป)"
+        # คาดการณ์วันขาย
+        est_sell_date = (datetime.now() + timedelta(days=cycle_days)).strftime('%d/%m/%Y')
 
-        # รูปแบบข้อความที่จะส่งเข้า Telegram
-        msg = (
-            f"📌 **ชื่อหุ้น**: {ticker}\n"
-            f"💵 **ราคาปัจจุบัน**: ${last_price:.2f}\n"
-            f"📥 **วันที่/จังหวะควรซื้อ**: {signal_text}\n"
-            f"🎯 **ราคาขายเป้าหมาย**: ${target_sell_price:.2f}\n"
-            f"📆 **คาดการณ์วันที่ควรขาย**: ประมาณวันที่ **{est_sell_date}**\n"
-            f"💰 **กำไรที่จะได้รับถ้าขาย**: **+${profit_usd:.2f} ต่อหุ้น** (+{PROFIT_TARGET_PCT*100:.0f}%)\n"
-            f"------------------------------------\n"
-            f"📈 *ข้อมูลราคาอ้างอิงตรงกับแอป Dime! (US Market)*"
+        # ------------------------------------------
+        # 🎯 กรองสัญญาณเพื่อความแม่นยำสูง (เน้นกำไรจริง)
+        # ------------------------------------------
+        if last_rsi <= 42 and is_uptrend:
+            status_emoji = "🟢"
+            status_header = "BUY (น่าเข้าซื้อมาก)"
+            advice = "🔥 *หุ้นย่อตัวในขาขึ้น* (โอกาสชนะสูงมาก)"
+            is_alert = True
+        elif last_rsi <= 40 and not is_uptrend:
+            status_emoji = "⚠️"
+            status_header = "RISKY BUY (ซื้อได้แต่เสี่ยง)"
+            advice = "⚡ *หุ้นอยู่ขาลง* ควรแบ่งไม้เล็กๆ เท่านั้น"
+            is_alert = True
+        elif last_rsi >= 68:
+            status_emoji = "🔴"
+            status_header = "SELL (ควรขายทำกำไร)"
+            advice = "💰 *เข้าเขตราคาแพง* แนะนำแบ่งขายเก็บกำไร"
+            is_alert = True
+        else:
+            status_emoji = "🟡"
+            status_header = "HOLD / WAIT (ถือ/รอจังหวะ)"
+            advice = "⏳ *ราคากลางๆ* รอสัญญาณย่อตัวค่อยซื้อ"
+            is_alert = False
+
+        # จัดรูปแบบข้อความให้อ่านง่าย ชัดเจน
+        report = (
+            f"{status_emoji} *{ticker}* | *{status_header}*\n"
+            f"━━━━━━━━━━━━━━━━━━━\n"
+            f"💵 *ราคาปัจจุบัน*: `${last_price:.2f}` (RSI: {last_rsi:.1f})\n"
+            f"📅 *วันที่ควรซื้อ*: `{today_str}`\n"
+            f"📥 *ราคาที่แนะนำซื้อ*: `${buy_price:.2f}`\n"
+            f"🎯 *เป้าขายทำกำไร (+{PROFIT_TARGET_PCT:.0f}%):* `${sell_price:.2f}`\n"
+            f"💰 *กำไรคาดการณ์*: `+${profit_usd:.2f} / หุ้น`\n"
+            f"🛡️ *จุดตัดขาดทุน (-{STOP_LOSS_PCT:.0f}%):* `${stop_loss:.2f}`\n"
+            f"📆 *คาดการณ์วันขาย*: `{est_sell_date}` (~{cycle_days} วัน)\n"
+            f"💡 *กลยุทธ์*: {advice}\n"
         )
-        return msg, status
-    except Exception as e:
-        print(f"Error analyzing {ticker}: {e}")
-        return None, None
 
-def send_telegram(text):
-    if not TELEGRAM_TOKEN or not TELEGRAM_CHAT_ID:
-        print("Missing Telegram credentials!")
-        return
-    url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
-    payload = {"chat_id": TELEGRAM_CHAT_ID, "text": text, "parse_mode": "Markdown"}
-    requests.post(url, json=payload)
+        print(f"[{ticker}] RSI: {last_rsi:.1f} | Uptrend: {is_uptrend} -> {status_header}")
+        all_reports.append(report)
+        if is_alert:
+            alert_reports.append(report)
+
+    if alert_reports:
+        msg = "📢 *[Dime!] สัญญาณเตือนหุ้นน่าลงทุนวันนี้*\n" + "*(คัดเฉพาะตัวที่มีโอกาสทำกำไรสูง)*\n\n" + "\n".join(alert_reports)
+        send_telegram_message(msg)
+        print("✅ ส่งแจ้งเตือนหุ้นติดสัญญาณเข้า Telegram เรียบร้อย!")
+    else:
+        msg = "📊 *[Dime!] สรุปภาพรวมหุ้นวันนี้*\n\n*(ยังไม่มีหุ้นตัวไหนย่อตัวเข้าจุดซื้อที่ปลอดภัย)*\n\n" + "\n".join(all_reports[:3])
+        send_telegram_message(msg)
+        print("ℹ️ ส่งรายงานสรุปทั่วไปเข้า Telegram เรียบร้อย!")
 
 if __name__ == "__main__":
-    for ticker in WATCHLIST:
-        msg, status = analyze_stock(ticker)
-        # ส่งการแจ้งเตือนเมื่อเจอสัญญาณซื้อ หรือ ขาย
-        if msg and status in ["BUY", "SELL"]:
-            send_telegram(msg)
+    run_dime_bot()

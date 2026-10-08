@@ -6,7 +6,7 @@ import requests
 from datetime import datetime, timedelta
 
 # ==========================================
-# ⚙️ ตั้งค่าข้อมูลบอท Dime!
+# ⚙️ ตั้งค่าข้อมูลบอท Dime! (อัปเดต Token ใหม่แล้ว)
 # ==========================================
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_TOKEN", "8921769324:AAHQCNuzUumIRk5j-spPd3T0DY9KkDtApYk")
 TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "8644030650")
@@ -136,11 +136,11 @@ def run_dime_bot():
             alert_reports.append(report)
 
     if alert_reports:
-        msg = "📢 *[Dime! - เวอร์ชันใหม่ 2.0] รายงานสัญญาณหุ้นวันนี้*\n" + "*(คัดเฉพาะตัวที่มีโอกาสทำกำไรสูง)*\n\n" + "\n".join(alert_reports)
+        msg = "📢 *[MyDimeBeamStock] รายงานสัญญาณหุ้นวันนี้*\n" + "*(คัดเฉพาะตัวที่มีโอกาสทำกำไรสูง)*\n\n" + "\n".join(alert_reports)
         send_telegram_message(msg)
         print("✅ ส่งแจ้งเตือนหุ้นติดสัญญาณเข้า Telegram เรียบร้อย!")
     else:
-        msg = "📊 *[Dime! - เวอร์ชันใหม่ 2.0] สรุปภาพรวมหุ้นวันนี้*\n\n*(ยังไม่มีหุ้นตัวไหนย่อตัวเข้าจุดซื้อที่ปลอดภัย)*\n\n" + "\n".join(all_reports[:3])
+        msg = "📊 *[MyDimeBeamStock] สรุปภาพรวมหุ้นวันนี้*\n\n*(ยังไม่มีหุ้นตัวไหนย่อตัวเข้าจุดซื้อที่ปลอดภัย)*\n\n" + "\n".join(all_reports[:3])
         send_telegram_message(msg)
         print("ℹ️ ส่งรายงานสรุปทั่วไปเข้า Telegram เรียบร้อย!")
 

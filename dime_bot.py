@@ -17,7 +17,6 @@ WATCHLIST = [
     "COIN", "SPY", "QQQ"
 ]
 
-# 🎯 บริหารความเสี่ยง
 PROFIT_TARGET_PCT = 10.0  # เป้ากำไร +10%
 STOP_LOSS_PCT = 5.0      # คัดขาดทุน -5%
 

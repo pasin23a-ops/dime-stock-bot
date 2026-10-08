@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 # ==========================================
 # ⚙️ ตั้งค่าข้อมูลบอท Dime!
 # ==========================================
-TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_TOKEN", "8938668097:AAFmVzQa6qIefASoTo2WfKk4FRytQyRPcJw")
+TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_TOKEN", "8921769324:AAHQCNuzUumIRk5j-spPd3T0DY9KkDtApYk")
 TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "8644030650")
 
 # 🚀 รายชื่อหุ้นยอดฮิตบน Dime!

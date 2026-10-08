@@ -10,14 +10,14 @@ from datetime import datetime, timedelta
 TELEGRAM_BOT_TOKEN = "8938668097:AAFmVzQa6qIefASoTo2WfKk4FRytQyRPcJw"
 TELEGRAM_CHAT_ID = "8644030650"
 
-# 🚀 รายชื่อหุ้นยอดฮิตบน Dime! (สภาพคล่องสูง มีเทรนด์ชัดเจน)
+# 🚀 รายชื่อหุ้นยอดฮิตบน Dime!
 WATCHLIST = [
     "NVDA", "AAPL", "TSLA", "MSFT", "PLTR", 
     "AMZN", "GOOGL", "META", "AMD", "NFLX", 
     "COIN", "SPY", "QQQ"
 ]
 
-# 🎯 บริหารความเสี่ยง (Risk / Reward = 1 : 2)
+# 🎯 บริหารความเสี่ยง
 PROFIT_TARGET_PCT = 10.0  # เป้ากำไร +10%
 STOP_LOSS_PCT = 5.0      # คัดขาดทุน -5%
 
@@ -79,7 +79,6 @@ def run_dime_bot():
         if isinstance(df.columns, pd.MultiIndex):
             df.columns = df.columns.get_level_values(0)
 
-        # คำนวณ RSI และ EMA 50 (ใช้ดูแนวโน้มใหญ่)
         df['RSI'] = calculate_rsi(df['Close'], period=14)
         df['EMA50'] = df['Close'].ewm(span=50, adjust=False).mean()
 
@@ -87,7 +86,6 @@ def run_dime_bot():
         last_rsi = float(df['RSI'].iloc[-1])
         ema50 = float(df['EMA50'].iloc[-1])
         
-        # เช็คแนวโน้ม (Uptrend)
         is_uptrend = last_price > ema50
         cycle_days = get_average_cycle_days(df)
 
@@ -96,12 +94,8 @@ def run_dime_bot():
         profit_usd = sell_price - buy_price
         stop_loss = buy_price * (1 - (STOP_LOSS_PCT / 100.0))
         
-        # คาดการณ์วันขาย
         est_sell_date = (datetime.now() + timedelta(days=cycle_days)).strftime('%d/%m/%Y')
 
-        # ------------------------------------------
-        # 🎯 กรองสัญญาณเพื่อความแม่นยำสูง (เน้นกำไรจริง)
-        # ------------------------------------------
         if last_rsi <= 42 and is_uptrend:
             status_emoji = "🟢"
             status_header = "BUY (น่าเข้าซื้อมาก)"
@@ -123,7 +117,6 @@ def run_dime_bot():
             advice = "⏳ *ราคากลางๆ* รอสัญญาณย่อตัวค่อยซื้อ"
             is_alert = False
 
-        # จัดรูปแบบข้อความให้อ่านง่าย ชัดเจน
         report = (
             f"{status_emoji} *{ticker}* | *{status_header}*\n"
             f"━━━━━━━━━━━━━━━━━━━\n"

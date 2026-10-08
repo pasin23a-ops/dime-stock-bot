@@ -1,3 +1,4 @@
+import os
 import pandas as pd
 import numpy as np
 import yfinance as yf
@@ -7,8 +8,8 @@ from datetime import datetime, timedelta
 # ==========================================
 # ⚙️ ตั้งค่าข้อมูลบอท Dime!
 # ==========================================
-TELEGRAM_BOT_TOKEN = "8938668097:AAFmVzQa6qIefASoTo2WfKk4FRytQyRPcJw"
-TELEGRAM_CHAT_ID = "8644030650"
+TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_TOKEN", "8938668097:AAFmVzQa6qIefASoTo2WfKk4FRytQyRPcJw")
+TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "8644030650")
 
 # 🚀 รายชื่อหุ้นยอดฮิตบน Dime!
 WATCHLIST = [
@@ -135,11 +136,11 @@ def run_dime_bot():
             alert_reports.append(report)
 
     if alert_reports:
-        msg = "📢 *[Dime!] สัญญาณเตือนหุ้นน่าลงทุนวันนี้*\n" + "*(คัดเฉพาะตัวที่มีโอกาสทำกำไรสูง)*\n\n" + "\n".join(alert_reports)
+        msg = "📢 *[Dime! - เวอร์ชันใหม่ 2.0] รายงานสัญญาณหุ้นวันนี้*\n" + "*(คัดเฉพาะตัวที่มีโอกาสทำกำไรสูง)*\n\n" + "\n".join(alert_reports)
         send_telegram_message(msg)
         print("✅ ส่งแจ้งเตือนหุ้นติดสัญญาณเข้า Telegram เรียบร้อย!")
     else:
-        msg = "📊 *[Dime!] สรุปภาพรวมหุ้นวันนี้*\n\n*(ยังไม่มีหุ้นตัวไหนย่อตัวเข้าจุดซื้อที่ปลอดภัย)*\n\n" + "\n".join(all_reports[:3])
+        msg = "📊 *[Dime! - เวอร์ชันใหม่ 2.0] สรุปภาพรวมหุ้นวันนี้*\n\n*(ยังไม่มีหุ้นตัวไหนย่อตัวเข้าจุดซื้อที่ปลอดภัย)*\n\n" + "\n".join(all_reports[:3])
         send_telegram_message(msg)
         print("ℹ️ ส่งรายงานสรุปทั่วไปเข้า Telegram เรียบร้อย!")
 
